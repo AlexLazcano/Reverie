@@ -27,4 +27,7 @@
         <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*"/>
         <PackageReference Include="NAudio" Version="2.2.1" />
     </ItemGroup>
+    <ItemGroup>
+      <ClCompile Include="Content\Shaders\VHSEffect.fx" />
+    </ItemGroup>
 </Project>

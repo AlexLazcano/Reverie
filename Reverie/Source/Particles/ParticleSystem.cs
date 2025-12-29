@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Reverie.Source;
 
@@ -17,12 +18,39 @@ public class ParticleSystem
     {
         this.maxParticles = maxParticles;
     }
+    private Texture2D CreateGlowTexture(GraphicsDevice graphicsDevice, int size = 64)
+    {
+         var texture = new Texture2D(graphicsDevice, size, size);
+         var data = new Color[size * size];
+         
+         var center =  new Vector2(size / 2f, size / 2f);
+         
+         var radius = size / 2f;
+    
+         for (var y = 0; y < size; y++)
+         {
+             for (var x = 0; x < size; x++)
+             {
+                 var pos = new Vector2(x, y);
+                 var distance = Vector2.Distance(pos, center);
+            
+                 // Smooth falloff for glow
+                 var intensity = 1f - Math.Clamp(distance / radius, 0f, 1f);
+                 intensity = (float)Math.Pow(intensity, 2); // Squared for softer glow
+            
+                 data[y * size + x] = Color.White * intensity;
+             }
+         }
+    
+         texture.SetData(data);
+         return texture;
+         
+    }
 
     public void Initialize(GraphicsDevice graphicsDevice)
     {
         // Create a simple 1x1 white pixel texture for particles
-        particleTexture = new Texture2D(graphicsDevice, 1, 1);
-        particleTexture.SetData(new[] { Color.White });
+        particleTexture = CreateGlowTexture(graphicsDevice, 32);
     }
 
     public void SpawnParticle(Vector2 position, Vector2 velocity, Color color, float lifetime, float size = 2f)
@@ -72,40 +100,14 @@ public class ParticleSystem
             float alpha = particle.Lifetime / particle.MaxLifetime;
             Color color = particle.Color * alpha;
 
-            // Outer glow (large, faint)
-            spriteBatch.Draw(
-                particleTexture,
-                particle.Position,
-                null,
-                color * 0.1f,
-                0f,
-                Vector2.Zero,
-                particle.Size * 4f,
-                SpriteEffects.None,
-                0f
-            );
-            // Middle glow
-            spriteBatch.Draw(
-                particleTexture,
-                particle.Position,
-                null,
-                color * 0.3f,
-                0f,
-                Vector2.Zero,
-                particle.Size * 2f,
-                SpriteEffects.None,
-                0f
-            );
-
-            // Core (bright)
             spriteBatch.Draw(
                 particleTexture,
                 particle.Position,
                 null,
                 color,
                 0f,
-                Vector2.Zero,
-                particle.Size,
+                new Vector2(particleTexture.Width / 2f, particleTexture.Height / 2f), // Center origin
+                particle.Size * 0.2f, // Scale down since texture is larger
                 SpriteEffects.None,
                 0f
             );
