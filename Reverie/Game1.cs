@@ -20,6 +20,8 @@ public class Game1 : Game
 
     private Effect _vhsEffect;
 
+    private Effect _forceFieldEffect;
+
     private float _time = 0f;
 
     public Game1()
@@ -29,13 +31,14 @@ public class Game1 : Game
         IsMouseVisible = true;
 
         // Set window size
-        _graphics.PreferredBackBufferWidth = 1920;
-        _graphics.PreferredBackBufferHeight = 1080;
+        _graphics.PreferredBackBufferWidth = 2560;
+        _graphics.PreferredBackBufferHeight = 1440;
     }
 
     protected override void Initialize()
     {
-        _particleSystem = new ParticleSystem(maxParticles: 10000);
+        _particleSystem = new ParticleSystem(maxParticles: 10000, height: _graphics.PreferredBackBufferHeight,
+            width: _graphics.PreferredBackBufferWidth);
         base.Initialize();
     }
 
@@ -61,6 +64,17 @@ public class Game1 : Game
             Console.WriteLine($"Failed to load VHS Effect: {ex.Message}");
             _vhsEffect = null;
         }
+
+        try
+        {
+            _forceFieldEffect = Content.Load<Effect>("Shaders/ForceFieldVisualization");
+            Console.WriteLine("Force Field Effect loaded successfully!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load Force Field Effect: {ex.Message}");
+            _forceFieldEffect = null;
+        }
     }
 
     protected override void Update(GameTime gameTime)
@@ -68,7 +82,7 @@ public class Game1 : Game
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
-        
+
         _time += (float)gameTime.ElapsedGameTime.TotalSeconds;
 
         // Spawn particles at mouse position for testing
@@ -84,19 +98,14 @@ public class Game1 : Game
             );
 
             // Dreamy blue/purple/cyan colors
-            Color color = _random.Next(3) switch
-            {
-                0 => new Color(100, 150, 255), // Blue
-                1 => new Color(150, 100, 255), // Purple
-                _ => new Color(100, 255, 255) // Cyan
-            };
+            Color color = ColorPalette.GetRandomDreamColor();
 
             _particleSystem.SpawnParticle(
                 position: mousePos,
                 velocity: velocity,
                 color: color,
-                lifetime: 2f,
-                size: 3f
+                lifetime: 30f,
+                size: _random.Next(3)
             );
         }
 
@@ -106,37 +115,139 @@ public class Game1 : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        var renderShader = true;
         _time += (float)gameTime.ElapsedGameTime.TotalSeconds;
-    
-        if (_vhsEffect != null && _renderTarget != null && renderShader)
+
+        if (_vhsEffect != null && _renderTarget != null)
         {
-            // FIRST PASS: Draw particles to render target
-            GraphicsDevice.SetRenderTarget(_renderTarget);
-            GraphicsDevice.Clear(new Color(10, 10, 20)); // Dark background
+            // Smooth galaxy pipeline (VHS only affects particles)
+            RenderParticlesToTarget();
+            var vhsTarget = ApplyVHSToParticles();
+            var galaxyTarget = ApplyGalaxyShader(vhsTarget);
+            DrawToScreen(galaxyTarget);
         
-            _particleSystem.Draw(_spriteBatch);
-        
-            // SECOND PASS: Draw render target to screen with VHS effect
-            GraphicsDevice.SetRenderTarget(null);
-            GraphicsDevice.Clear(Color.Black);
-        
-            _vhsEffect.Parameters["Time"].SetValue(_time);
-            _vhsEffect.Parameters["NoiseAmount"].SetValue(0.05f);
-            _vhsEffect.Parameters["ScanlineIntensity"].SetValue(0.02f);
-            _vhsEffect.Parameters["ChromaticAberration"].SetValue(0.002f);
-            _vhsEffect.Parameters["VignetteStrength"].SetValue(0.4f);
-        
-            _spriteBatch.Begin(effect: _vhsEffect, samplerState: SamplerState.LinearClamp);
-            _spriteBatch.Draw(_renderTarget, Vector2.Zero, Color.White);
-            _spriteBatch.End();
+            // vhsTarget?.Dispose();
+            galaxyTarget?.Dispose();
         }
         else
         {
             GraphicsDevice.Clear(new Color(10, 10, 20));
             _particleSystem.Draw(_spriteBatch);
         }
-    
+
         base.Draw(gameTime);
+    }
+
+    private void RenderParticlesToTarget()
+    {
+        GraphicsDevice.SetRenderTarget(_renderTarget);
+        GraphicsDevice.Clear(new Color(10, 10, 20));
+        _particleSystem.Draw(_spriteBatch);
+    }
+
+    private RenderTarget2D ApplyGalaxyShader()
+    {
+        if (_forceFieldEffect == null)
+            return null;
+
+        var galaxyTarget = new RenderTarget2D(
+            GraphicsDevice,
+            _graphics.PreferredBackBufferWidth,
+            _graphics.PreferredBackBufferHeight
+        );
+
+        GraphicsDevice.SetRenderTarget(galaxyTarget);
+        GraphicsDevice.Clear(Color.Transparent);
+
+        _forceFieldEffect.Parameters["Time"]?.SetValue(_time);
+        _forceFieldEffect.Parameters["ScreenSize"]?.SetValue(
+            new Vector2(_graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight)
+        );
+        _forceFieldEffect.Parameters["Intensity"]?.SetValue(0.60f);
+
+        _spriteBatch.Begin(effect: _forceFieldEffect, samplerState: SamplerState.LinearClamp);
+        _spriteBatch.Draw(_renderTarget, Vector2.Zero, Color.White);
+        _spriteBatch.End();
+
+        return galaxyTarget;
+    }
+
+    private void ApplyVhsAndDrawToScreen(RenderTarget2D sourceTarget)
+    {
+        GraphicsDevice.SetRenderTarget(null);
+        GraphicsDevice.Clear(Color.Black);
+
+        _vhsEffect.Parameters["Time"]?.SetValue(_time);
+        _vhsEffect.Parameters["NoiseAmount"]?.SetValue(0.05f);
+        _vhsEffect.Parameters["ScanlineIntensity"]?.SetValue(0.02f);
+        _vhsEffect.Parameters["ChromaticAberration"]?.SetValue(0.002f);
+        _vhsEffect.Parameters["VignetteStrength"]?.SetValue(0.4f);
+
+        _spriteBatch.Begin(effect: _vhsEffect, samplerState: SamplerState.LinearClamp);
+        _spriteBatch.Draw(sourceTarget ?? _renderTarget, Vector2.Zero, Color.White);
+        _spriteBatch.End();
+    }
+
+    private RenderTarget2D ApplyVHSToParticles()
+    {
+        if (_vhsEffect == null)
+            return _renderTarget;
+
+        var vhsTarget = new RenderTarget2D(
+            GraphicsDevice,
+            _graphics.PreferredBackBufferWidth,
+            _graphics.PreferredBackBufferHeight
+        );
+
+        GraphicsDevice.SetRenderTarget(vhsTarget);
+        GraphicsDevice.Clear(Color.Black);
+
+        _vhsEffect.Parameters["Time"]?.SetValue(_time);
+        _vhsEffect.Parameters["NoiseAmount"]?.SetValue(0.05f);
+        _vhsEffect.Parameters["ScanlineIntensity"]?.SetValue(0.02f);
+        _vhsEffect.Parameters["ChromaticAberration"]?.SetValue(0.002f);
+        _vhsEffect.Parameters["VignetteStrength"]?.SetValue(0.4f);
+
+        _spriteBatch.Begin(effect: _vhsEffect, samplerState: SamplerState.LinearClamp);
+        _spriteBatch.Draw(_renderTarget, Vector2.Zero, Color.White);
+        _spriteBatch.End();
+
+        return vhsTarget;
+    }
+
+    private RenderTarget2D ApplyGalaxyShader(RenderTarget2D sourceTarget)
+    {
+        if (_forceFieldEffect == null)
+            return sourceTarget;
+
+        var galaxyTarget = new RenderTarget2D(
+            GraphicsDevice,
+            _graphics.PreferredBackBufferWidth,
+            _graphics.PreferredBackBufferHeight
+        );
+
+        GraphicsDevice.SetRenderTarget(galaxyTarget);
+        GraphicsDevice.Clear(Color.Transparent);
+
+        _forceFieldEffect.Parameters["Time"]?.SetValue(_time);
+        _forceFieldEffect.Parameters["ScreenSize"]?.SetValue(
+            new Vector2(_graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight)
+        );
+        _forceFieldEffect.Parameters["Intensity"]?.SetValue(0.60f);
+
+        _spriteBatch.Begin(effect: _forceFieldEffect, samplerState: SamplerState.LinearClamp);
+        _spriteBatch.Draw(sourceTarget, Vector2.Zero, Color.White);
+        _spriteBatch.End();
+
+        return galaxyTarget;
+    }
+
+    private void DrawToScreen(RenderTarget2D sourceTarget)
+    {
+        GraphicsDevice.SetRenderTarget(null);
+        GraphicsDevice.Clear(Color.Black);
+
+        _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
+        _spriteBatch.Draw(sourceTarget, Vector2.Zero, Color.White);
+        _spriteBatch.End();
     }
 }

@@ -13,6 +13,12 @@
 
 #---------------------------------- Content ---------------------------------#
 
+#begin Shaders/ForceFieldVisualization.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Shaders/ForceFieldVisualization.fx
+
 #begin Shaders/VHSEffect.fx
 /importer:EffectImporter
 /processor:EffectProcessor

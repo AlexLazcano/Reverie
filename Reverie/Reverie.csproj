@@ -28,6 +28,7 @@
         <PackageReference Include="NAudio" Version="2.2.1" />
     </ItemGroup>
     <ItemGroup>
+      <ClCompile Include="Content\Shaders\ForceFieldVisualization.fx" />
       <ClCompile Include="Content\Shaders\VHSEffect.fx" />
     </ItemGroup>
 </Project>
