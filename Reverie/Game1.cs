@@ -77,7 +77,19 @@ public class Game1 : Game
         }
     }
 
-    protected override void Update(GameTime gameTime)
+    private void SpawnParticleAtPoint(float x, float y, float angle, float speed = 100f, float lifetime = 5, float spread = 0f)
+    {
+        var randomSpread = (_random.NextSingle() - 0.5f) * MathHelper.ToRadians(spread);
+        var finalAngle = angle + randomSpread;
+        var velocity = new Vector2(
+            (float)Math.Cos(finalAngle) * speed,
+            (float)Math.Sin(finalAngle) * speed
+        );
+
+        _particleSystem.SpawnParticle(new Vector2(x, y), velocity, ColorPalette.GetRandomDreamColor(), lifetime, _random.Next(3));
+    }
+
+    override protected void Update(GameTime gameTime)
     {
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
@@ -85,35 +97,22 @@ public class Game1 : Game
 
         _time += (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-        // Spawn particles at mouse position for testing
-        var mouseState = Mouse.GetState();
-        Vector2 mousePos = new Vector2(mouseState.X, mouseState.Y);
 
-        // Spawn a few particles each frame at mouse position
         for (int i = 0; i < 5; i++)
         {
-            Vector2 velocity = new Vector2(
-                (_random.NextSingle() - 0.5f) * 100f,
-                (_random.NextSingle() - 0.5f) * 100f
-            );
-
             // Dreamy blue/purple/cyan colors
-            Color color = ColorPalette.GetRandomDreamColor();
-
-            _particleSystem.SpawnParticle(
-                position: mousePos,
-                velocity: velocity,
-                color: color,
-                lifetime: 30f,
-                size: _random.Next(3)
-            );
+            // SpawnParticleAtPoint(600, 600, _time, lifetime:30f);
+            const float sharedAngle = MathF.PI * (1f / 8f);
+            SpawnParticleAtPoint(0, 0, angle: sharedAngle, lifetime: 30f, spread: 45);
+            SpawnParticleAtPoint(_graphics.PreferredBackBufferWidth / 2f, 0, angle: sharedAngle, lifetime: 30f, spread: 45);
+            SpawnParticleAtPoint(0, _graphics.PreferredBackBufferHeight / 2f, sharedAngle, lifetime: 30f, spread: 45);
         }
 
         _particleSystem.Update(gameTime);
         base.Update(gameTime);
     }
 
-    protected override void Draw(GameTime gameTime)
+    override protected void Draw(GameTime gameTime)
     {
         _time += (float)gameTime.ElapsedGameTime.TotalSeconds;
 
@@ -124,8 +123,8 @@ public class Game1 : Game
             var vhsTarget = ApplyVHSToParticles();
             var galaxyTarget = ApplyGalaxyShader(vhsTarget);
             DrawToScreen(galaxyTarget);
-        
-            // vhsTarget?.Dispose();
+
+            vhsTarget?.Dispose();
             galaxyTarget?.Dispose();
         }
         else
@@ -171,21 +170,6 @@ public class Game1 : Game
         return galaxyTarget;
     }
 
-    private void ApplyVhsAndDrawToScreen(RenderTarget2D sourceTarget)
-    {
-        GraphicsDevice.SetRenderTarget(null);
-        GraphicsDevice.Clear(Color.Black);
-
-        _vhsEffect.Parameters["Time"]?.SetValue(_time);
-        _vhsEffect.Parameters["NoiseAmount"]?.SetValue(0.05f);
-        _vhsEffect.Parameters["ScanlineIntensity"]?.SetValue(0.02f);
-        _vhsEffect.Parameters["ChromaticAberration"]?.SetValue(0.002f);
-        _vhsEffect.Parameters["VignetteStrength"]?.SetValue(0.4f);
-
-        _spriteBatch.Begin(effect: _vhsEffect, samplerState: SamplerState.LinearClamp);
-        _spriteBatch.Draw(sourceTarget ?? _renderTarget, Vector2.Zero, Color.White);
-        _spriteBatch.End();
-    }
 
     private RenderTarget2D ApplyVHSToParticles()
     {

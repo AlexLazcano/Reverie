@@ -51,6 +51,8 @@ public record struct Particle
     public float MaxLifetime;
     public float Size;
     public bool IsAlive => Lifetime > 0f;
+    public float Age => MaxLifetime - Lifetime;
+
 
     public void Update(float deltaTime)
     {

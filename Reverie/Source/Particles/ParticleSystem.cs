@@ -73,18 +73,14 @@ public class ParticleSystem(int maxParticles = 5000, int height = 1440, int widt
         for (var i = particles.Count - 1; i >= 0; i--)
         {
             var particle = particles[i];
-            // var force = ParticleForces.CalculateVortexAttraction(
-            //     particle.Position,
-            //     screenCenter,
-            //     150f,
-            //     250f
-            // );
-
-            // particle.ApplyForce(force);
-            
+            var force = ParticleForces.CalculateVortexAttraction(
+                particle.Position,
+                screenCenter,
+                MathF.Pow(2,12),
+                2f
+            );
             var curlForce = ParticleForces.CurlNoise(particle.Position, deltaTime);
-
-            particle.ApplyForce(curlForce);
+            particle.ApplyForce(curlForce + force);
             particle.Update(deltaTime);
 
             if (particle.IsAlive)
@@ -105,8 +101,8 @@ public class ParticleSystem(int maxParticles = 5000, int height = 1440, int widt
         foreach (var particle in particles)
         {
             // Fade alpha based on lifetime
-            float alpha = particle.Lifetime / particle.MaxLifetime;
-            Color color = particle.Color * alpha;
+            var alpha = MathHelper.Lerp(1.0f, 0.40f, particle.Age / particle.MaxLifetime);
+            var color = particle.Color * alpha;
 
             spriteBatch.Draw(
                 particleTexture,
