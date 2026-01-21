@@ -128,18 +128,40 @@ public class Game1 : Game
             _particleSystem.Bass = _audioCapture.Bass;
             _particleSystem.Mid = _audioCapture.Mid;
             _particleSystem.Treble = _audioCapture.Treble;
+            _particleSystem.BeatIntensity = _audioCapture.BeatIntensity;
         }
 
+        const float lifetime = 10f;
         for (int i = 0; i < 5; i++)
         {
-            const float sharedAngle = MathF.PI * (1f / 8f);
+            float screenWidth = _graphics.PreferredBackBufferWidth;
+            float screenHeight = _graphics.PreferredBackBufferHeight;
+            var center = new Vector2(screenWidth / 2f, screenHeight / 2f);
+            float spawnRadius = Math.Min(screenWidth, screenHeight) * 0.45f;
+            float angleOffset = MathHelper.ToRadians(60f);  // Slight offset from pointing at center
 
+            // Bass at 0 degrees, Mid at 120, Treble at 240
             if (EnableBass)
-                SpawnParticleAtPoint(0, 0, angle: sharedAngle, lifetime: 30f, spread: 45, frequencyBand: FrequencyBand.Bass);
+            {
+                float baseAngle = MathHelper.ToRadians(0f);
+                var spawnPos = center + new Vector2(MathF.Cos(baseAngle), MathF.Sin(baseAngle)) * spawnRadius;
+                float towardCenter = baseAngle + MathF.PI + angleOffset;
+                SpawnParticleAtPoint(spawnPos.X, spawnPos.Y, angle: towardCenter, lifetime: lifetime, spread: 12, frequencyBand: FrequencyBand.Bass);
+            }
             if (EnableMid)
-                SpawnParticleAtPoint(_graphics.PreferredBackBufferWidth / 2f, 0, angle: sharedAngle, lifetime: 30f, spread: 45, frequencyBand: FrequencyBand.Mid);
+            {
+                float baseAngle = MathHelper.ToRadians(120f);
+                var spawnPos = center + new Vector2(MathF.Cos(baseAngle), MathF.Sin(baseAngle)) * spawnRadius;
+                float towardCenter = baseAngle + MathF.PI + angleOffset;
+                SpawnParticleAtPoint(spawnPos.X, spawnPos.Y, angle: towardCenter, lifetime: lifetime, spread: 12, frequencyBand: FrequencyBand.Mid);
+            }
             if (EnableTreble)
-                SpawnParticleAtPoint(0, _graphics.PreferredBackBufferHeight / 2f, sharedAngle, lifetime: 30f, spread: 45, frequencyBand: FrequencyBand.Treble);
+            {
+                float baseAngle = MathHelper.ToRadians(240f);
+                var spawnPos = center + new Vector2(MathF.Cos(baseAngle), MathF.Sin(baseAngle)) * spawnRadius;
+                float towardCenter = baseAngle + MathF.PI + angleOffset;
+                SpawnParticleAtPoint(spawnPos.X, spawnPos.Y, angle: towardCenter, lifetime: lifetime, spread: 12, frequencyBand: FrequencyBand.Treble);
+            }
         }
 
         _particleSystem.Update(gameTime);

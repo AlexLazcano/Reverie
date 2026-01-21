@@ -18,6 +18,7 @@ public class ParticleSystem(int maxParticles = 5000, int height = 1440, int widt
     public float Bass { get; set; }
     public float Mid { get; set; }
     public float Treble { get; set; }
+    public float BeatIntensity { get; set; }
 
 
     private Texture2D CreateGlowTexture(GraphicsDevice graphicsDevice, int size = 64)
@@ -90,14 +91,17 @@ public class ParticleSystem(int maxParticles = 5000, int height = 1440, int widt
         for (var i = particles.Count - 1; i >= 0; i--)
         {
             var particle = particles[i];
+
+            // Vortex strength increases on beat
+            float vortexStrength = MathF.Pow(2, 12) * (1f + BeatIntensity * 2f);
             var force = ParticleForces.CalculateVortexAttraction(
                 particle.Position,
                 screenCenter,
-                MathF.Pow(2,12),
+                vortexStrength,
                 2f
             );
             var curlForce = ParticleForces.CurlNoise(particle.Position, deltaTime);
-            particle.ApplyForce(curlForce + force);
+            particle.ApplyForce(force);
             particle.Update(deltaTime);
 
             if (particle.IsAlive)

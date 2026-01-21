@@ -17,9 +17,9 @@ public class AudioCaptureService : IDisposable
     private const float SmoothingFactor = 0.5f;
 
     // Amplification to make frequency response more visible
-    private const float BassGain = 20f;
-    private const float MidGain = 20f;
-    private const float TrebleGain = 20f;
+    private const float BassGain = 10f;
+    private const float MidGain = 30f;
+    private const float TrebleGain = 30f;
 
     // Thread-safe frequency band properties
     private volatile float _bass;
@@ -28,6 +28,20 @@ public class AudioCaptureService : IDisposable
     private volatile float _highMid;
     private volatile float _treble;
     private volatile float _currentLevel;
+
+    // Beat detection
+    private const int EnergyHistorySize = 43;  // ~1 second at 48kHz/2048 samples
+    private readonly float[] _energyHistory = new float[EnergyHistorySize];
+    private int _energyHistoryIndex = 0;
+    private volatile bool _isBeat;
+    private volatile float _beatIntensity;
+    private float _lastBeatTime;
+    private float _totalTime;
+    private const float BeatCooldown = 0.1f;  // 100ms minimum between beats
+    private const float BeatThreshold = 1.4f;  // Current must be 1.4x average to trigger
+
+    public bool IsBeat => _isBeat;
+    public float BeatIntensity => _beatIntensity;
 
     public float Bass => _bass;
     public float LowMid => _lowMid;
@@ -178,6 +192,40 @@ public class AudioCaptureService : IDisposable
         _mid = _mid + (newMid - _mid) * SmoothingFactor;
         _highMid = _highMid + (newHighMid - _highMid) * SmoothingFactor;
         _treble = _treble + (newTreble - _treble) * SmoothingFactor;
+
+        // Detect beats using bass energy
+        DetectBeat(_bass);
+    }
+
+    private void DetectBeat(float currentBass)
+    {
+        // Estimate time progression based on FFT rate (~23ms per FFT at 48kHz/2048)
+        _totalTime += (float)_fftSize / 48000f;
+
+        // Add to history
+        _energyHistory[_energyHistoryIndex] = currentBass;
+        _energyHistoryIndex = (_energyHistoryIndex + 1) % EnergyHistorySize;
+
+        // Calculate average energy
+        float avgEnergy = 0f;
+        for (int i = 0; i < EnergyHistorySize; i++)
+            avgEnergy += _energyHistory[i];
+        avgEnergy /= EnergyHistorySize;
+
+        // Check for beat (current significantly above average + cooldown passed)
+        bool cooldownPassed = (_totalTime - _lastBeatTime) > BeatCooldown;
+
+        if (currentBass > avgEnergy * BeatThreshold && avgEnergy > 0.05f && cooldownPassed)
+        {
+            _isBeat = true;
+            _beatIntensity = Math.Clamp((currentBass - avgEnergy) / avgEnergy, 0f, 1f);
+            _lastBeatTime = _totalTime;
+        }
+        else
+        {
+            _isBeat = false;
+            _beatIntensity *= 0.9f;  // Decay
+        }
     }
 
     private static float AverageMagnitude(double[] magnitudes, int startBin, int endBin)
