@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Reverie.Source;
+using Reverie.Source.Audio;
 
 namespace Reverie;
 
@@ -24,6 +25,15 @@ public class Game1 : Game
 
     private float _time = 0f;
 
+    private float _audioLevel = 0f;
+
+    private AudioCaptureService _audioCapture;
+
+    // Toggle frequency bands on/off for testing
+    private const bool EnableBass = true;
+    private const bool EnableMid = true;
+    private const bool EnableTreble = true;
+
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
@@ -39,6 +49,10 @@ public class Game1 : Game
     {
         _particleSystem = new ParticleSystem(maxParticles: 10000, height: _graphics.PreferredBackBufferHeight,
             width: _graphics.PreferredBackBufferWidth);
+
+        _audioCapture = new AudioCaptureService();
+        _audioCapture.Start();
+
         base.Initialize();
     }
 
@@ -77,16 +91,26 @@ public class Game1 : Game
         }
     }
 
-    private void SpawnParticleAtPoint(float x, float y, float angle, float speed = 100f, float lifetime = 5, float spread = 0f)
+    private void SpawnParticleAtPoint(float x, float y, float angle, float speed = 100f, float lifetime = 5f, float spread = 0f, FrequencyBand frequencyBand = FrequencyBand.Bass)
     {
         var randomSpread = (_random.NextSingle() - 0.5f) * MathHelper.ToRadians(spread);
         var finalAngle = angle + randomSpread;
+
         var velocity = new Vector2(
             (float)Math.Cos(finalAngle) * speed,
             (float)Math.Sin(finalAngle) * speed
         );
 
-        _particleSystem.SpawnParticle(new Vector2(x, y), velocity, ColorPalette.GetRandomDreamColor(), lifetime, _random.Next(3));
+        var baseColor = ColorPalette.GetColorForFrequency(frequencyBand);
+
+        _particleSystem.SpawnParticle(
+            new Vector2(x, y),
+            velocity,
+            baseColor,
+            lifetime,
+            _random.Next(3),
+            frequencyBand
+        );
     }
 
     override protected void Update(GameTime gameTime)
@@ -97,15 +121,25 @@ public class Game1 : Game
 
         _time += (float)gameTime.ElapsedGameTime.TotalSeconds;
 
+        if (_audioCapture != null)
+        {
+            _audioLevel = _audioCapture.CurrentLevel;
+            _particleSystem.AudioLevel = _audioLevel;
+            _particleSystem.Bass = _audioCapture.Bass;
+            _particleSystem.Mid = _audioCapture.Mid;
+            _particleSystem.Treble = _audioCapture.Treble;
+        }
 
         for (int i = 0; i < 5; i++)
         {
-            // Dreamy blue/purple/cyan colors
-            // SpawnParticleAtPoint(600, 600, _time, lifetime:30f);
             const float sharedAngle = MathF.PI * (1f / 8f);
-            SpawnParticleAtPoint(0, 0, angle: sharedAngle, lifetime: 30f, spread: 45);
-            SpawnParticleAtPoint(_graphics.PreferredBackBufferWidth / 2f, 0, angle: sharedAngle, lifetime: 30f, spread: 45);
-            SpawnParticleAtPoint(0, _graphics.PreferredBackBufferHeight / 2f, sharedAngle, lifetime: 30f, spread: 45);
+
+            if (EnableBass)
+                SpawnParticleAtPoint(0, 0, angle: sharedAngle, lifetime: 30f, spread: 45, frequencyBand: FrequencyBand.Bass);
+            if (EnableMid)
+                SpawnParticleAtPoint(_graphics.PreferredBackBufferWidth / 2f, 0, angle: sharedAngle, lifetime: 30f, spread: 45, frequencyBand: FrequencyBand.Mid);
+            if (EnableTreble)
+                SpawnParticleAtPoint(0, _graphics.PreferredBackBufferHeight / 2f, sharedAngle, lifetime: 30f, spread: 45, frequencyBand: FrequencyBand.Treble);
         }
 
         _particleSystem.Update(gameTime);
@@ -233,5 +267,12 @@ public class Game1 : Game
         _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
         _spriteBatch.Draw(sourceTarget, Vector2.Zero, Color.White);
         _spriteBatch.End();
+    }
+
+    protected override void OnExiting(object sender, ExitingEventArgs args)
+    {
+        _audioCapture?.Stop();
+        _audioCapture?.Dispose();
+        base.OnExiting(sender, args);
     }
 }

@@ -14,6 +14,11 @@ public class ParticleSystem(int maxParticles = 5000, int height = 1440, int widt
 
     private Vector2 screenCenter = new(width / 2f, height / 2f);
 
+    public float AudioLevel { get; set; } = 0.5f;
+    public float Bass { get; set; }
+    public float Mid { get; set; }
+    public float Treble { get; set; }
+
 
     private Texture2D CreateGlowTexture(GraphicsDevice graphicsDevice, int size = 64)
     {
@@ -49,7 +54,7 @@ public class ParticleSystem(int maxParticles = 5000, int height = 1440, int widt
         particleTexture = CreateGlowTexture(graphicsDevice, 32);
     }
 
-    public void SpawnParticle(Vector2 position, Vector2 velocity, Color color, float lifetime, float size = 2f)
+    public void SpawnParticle(Vector2 position, Vector2 velocity, Color color, float lifetime, float size = 2f, FrequencyBand frequencyBand = FrequencyBand.Bass)
     {
         if (particles.Count >= maxParticles)
             return;
@@ -61,8 +66,20 @@ public class ParticleSystem(int maxParticles = 5000, int height = 1440, int widt
             Color = color,
             Lifetime = lifetime,
             MaxLifetime = lifetime,
-            Size = size
+            Size = size,
+            FrequencyBand = frequencyBand
         });
+    }
+
+    private float GetFrequencyLevel(FrequencyBand band)
+    {
+        return band switch
+        {
+            FrequencyBand.Bass => Bass,
+            FrequencyBand.Mid => Mid,
+            FrequencyBand.Treble => Treble,
+            _ => AudioLevel
+        };
     }
 
     public void Update(GameTime gameTime)
@@ -100,9 +117,13 @@ public class ParticleSystem(int maxParticles = 5000, int height = 1440, int widt
 
         foreach (var particle in particles)
         {
-            // Fade alpha based on lifetime
-            var alpha = MathHelper.Lerp(1.0f, 0.40f, particle.Age / particle.MaxLifetime);
-            var color = particle.Color * alpha;
+            // Get the frequency level for this particle's band
+            float frequencyLevel = GetFrequencyLevel(particle.FrequencyBand);
+
+            // Brightness and size driven purely by frequency
+            float brightness = 0.6f + frequencyLevel * 3f;
+            var color = new Color(particle.Color.ToVector3() * brightness);
+            var size = particle.Size * (0.5f + frequencyLevel * 10f);
 
             spriteBatch.Draw(
                 particleTexture,
@@ -110,8 +131,8 @@ public class ParticleSystem(int maxParticles = 5000, int height = 1440, int widt
                 null,
                 color,
                 0f,
-                new Vector2(particleTexture.Width / 2f, particleTexture.Height / 2f), // Center origin
-                particle.Size * 0.2f, // Scale down since texture is larger
+                new Vector2(particleTexture.Width / 2f, particleTexture.Height / 2f),
+                size * 0.2f,
                 SpriteEffects.None,
                 0f
             );

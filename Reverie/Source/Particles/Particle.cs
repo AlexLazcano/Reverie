@@ -3,6 +3,12 @@ using Microsoft.Xna.Framework;
 
 namespace Reverie.Source;
 
+public enum FrequencyBand
+{
+    Bass,
+    Mid,
+    Treble
+}
 
 public static class ColorPalette
 {
@@ -37,6 +43,18 @@ public static class ColorPalette
     {
         return Color.Lerp(start, end, amount);
     }
+
+    // Get color based on frequency band
+    public static Color GetColorForFrequency(FrequencyBand band)
+    {
+        return band switch
+        {
+            FrequencyBand.Bass => new Color(255, 80, 120),    // Warm magenta/pink
+            FrequencyBand.Mid => CosmicPurple,                // Purple
+            FrequencyBand.Treble => EtherealCyan,             // Cyan
+            _ => OceanBlue
+        };
+    }
 }
 public record struct Particle
 {
@@ -50,6 +68,7 @@ public record struct Particle
 
     public float MaxLifetime;
     public float Size;
+    public FrequencyBand FrequencyBand;
     public bool IsAlive => Lifetime > 0f;
     public float Age => MaxLifetime - Lifetime;
 
